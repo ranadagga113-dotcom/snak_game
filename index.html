@@ -1,0 +1,165 @@
+import random
+import sys
+import pygame
+
+# 1. تهيئة اللعبة وإعداد الشاشة
+pygame.init()
+
+# أبعاد الشاشة وحجم الشبكة
+WIDTH, HEIGHT = 600, 600
+GRID_SIZE = 20  # حجم كل مربع في اللعبة
+
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("لعبة الأفعى الكلاسيكية - Snake")
+clock = pygame.time.Clock()
+
+# 2. الألوان (RGB)
+BLACK = (20, 20, 20)
+WHITE = (255, 255, 255)
+GREEN = (46, 204, 113)
+DARK_GREEN = (39, 174, 96)
+RED = (231, 76, 60)
+GRAY = (50, 50, 50)
+
+
+def generate_food(snake_body):
+    """توليد طعام في مكان عشوائي لا يتقاطع مع جسم الأفعى"""
+    while True:
+        x = random.randint(0, (WIDTH - GRID_SIZE) // GRID_SIZE) * GRID_SIZE
+        y = random.randint(0, (HEIGHT - GRID_SIZE) // GRID_SIZE) * GRID_SIZE
+        if (x, y) not in snake_body:
+            return (x, y)
+
+
+def reset_game():
+    """إعادة ضبط متغيرات اللعبة للبداية"""
+    snake = [
+        (100, 100),
+        (80, 100),
+        (60, 100),
+    ]  # جسم الأفعى (الرأس أول عنصر)
+    direction = (GRID_SIZE, 0)  # الاتجاه الابتدائي: يمين
+    food = generate_food(snake)
+    score = 0
+    speed = 10  # السرعة الابتدائية
+    return snake, direction, food, score, speed
+
+
+# بداية اللعبة
+snake, direction, food, score, speed = reset_game()
+game_over = False
+
+# 3. الحلقة الرئيسية للعبة (Game Loop)
+running = True
+while running:
+    # التحكم في سرعة اللعبة (Frames Per Second)
+    clock.tick(speed)
+
+    # 4. الاستجابة للمدخلات (الأزرار)
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.KEYDOWN:
+            if not game_over:
+                # تغيير الاتجاه بشرط عدم العكس المباشر (مثلاً: عدم التحرك لليسار أثناء الاتجاه لليمين)
+                if (
+                    event.key == pygame.K_UP or event.key == pygame.K_w
+                ) and direction != (0, GRID_SIZE):
+                    direction = (0, -GRID_SIZE)
+                elif (
+                    event.key == pygame.K_DOWN or event.key == pygame.K_s
+                ) and direction != (0, -GRID_SIZE):
+                    direction = (0, GRID_SIZE)
+                elif (
+                    event.key == pygame.K_LEFT or event.key == pygame.K_a
+                ) and direction != (GRID_SIZE, 0):
+                    direction = (-GRID_SIZE, 0)
+                elif (
+                    event.key == pygame.K_RIGHT or event.key == pygame.K_d
+                ) and direction != (-GRID_SIZE, 0):
+                    direction = (GRID_SIZE, 0)
+            else:
+                # إعادة التشغيل أو الخروج عند انتهاء اللعبة
+                if event.key == pygame.K_r:
+                    snake, direction, food, score, speed = reset_game()
+                    game_over = False
+                elif event.key == pygame.K_q:
+                    running = False
+
+    if not game_over:
+        # 5. تحديث موقع الأفعى
+        new_head = (snake[0][0] + direction[0], snake[0][1] + direction[1])
+
+        # فحص الاصطدام بالتخوم/الجدران
+        if (
+            new_head[0] < 0
+            or new_head[0] >= WIDTH
+            or new_head[1] < 0
+            or new_head[1] >= HEIGHT
+        ):
+            game_over = True
+
+        # فحص الاصطدام بالجسم
+        if new_head in snake:
+            game_over = True
+
+        if not game_over:
+            # إضافة الرأس الجديد
+            snake.insert(0, new_head)
+
+            # فحص أكل الطعام
+            if new_head == food:
+                score += 10
+                food = generate_food(snake)
+                # زيادة السرعة تدريجياً كل 50 نقطة
+                if score % 50 == 0:
+                    speed += 1
+            else:
+                # إزالة الذيل إذا لم تأكل الطعام
+                snake.pop()
+
+    # 6. الرسم على الشاشة
+    screen.fill(BLACK)
+
+    # رسم خلفية الشبكة (اختياري لمظهر كلاسيكي)
+    for x in range(0, WIDTH, GRID_SIZE):
+        pygame.draw.line(screen, GRAY, (x, 0), (x, HEIGHT), 1)
+    for y in range(0, HEIGHT, GRID_SIZE):
+        pygame.draw.line(screen, GRAY, (0, y), (WIDTH, y), 1)
+
+    # رسم الطعام (تفاحة حمراء)
+    pygame.draw.rect(
+        screen, RED, (food[0], food[1], GRID_SIZE - 2, GRID_SIZE - 2)
+    )
+
+    # رسم الأفعى
+    for i, segment in enumerate(snake):
+        # تمييز الرأس بلون مختلف قليلاً
+        color = GREEN if i == 0 else DARK_GREEN
+        pygame.draw.rect(
+            screen, color, (segment[0], segment[1], GRID_SIZE - 2, GRID_SIZE - 2)
+        )
+
+    # عرض النتيجة
+    font = pygame.font.SysFont("arial", 22, bold=True)
+    score_text = font.render(f"Score: {score}", True, WHITE)
+    screen.blit(score_text, (10, 10))
+
+    # شاشة الخسارة عند انتهاء اللعبة
+    if game_over:
+        font_lg = pygame.font.SysFont("arial", 45, bold=True)
+        font_sm = pygame.font.SysFont("arial", 20)
+
+        over_txt = font_lg.render("GAME OVER", True, RED)
+        restart_txt = font_sm.render(
+            "Press R to Restart or Q to Quit", True, WHITE
+        )
+
+        screen.blit(over_txt, (WIDTH // 2 - 130, HEIGHT // 2 - 50))
+        screen.blit(restart_txt, (WIDTH // 2 - 140, HEIGHT // 2 + 20))
+
+    pygame.display.flip()
+
+pygame.quit()
+sys.exit()
